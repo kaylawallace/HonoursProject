@@ -8,7 +8,10 @@
 #define TFT_CS 53
 #define TFT_BL 9
 
-#define DHTPIN 7
+#define DHTPIN 24
+#define DHTTYPE DHT11 
+
+#define MOISTURESENSORPIN A0
 
 #define GREEN    0x2BC9
 #define WHITE    0xFFFF
@@ -28,13 +31,16 @@ Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_BL);
 //Adafruit_ILI9341 tft = Adafruit_ILI
 //9341(TFT_CS, TFT_DC, TFT_MOSI, TFT_CLK, TFT_RST, TFT_MISO);
 GFXcanvas1 canvas(200, 50);
+DHT dht(DHTPIN, DHTTYPE);
 
 const int btnPin1 = 2;
 const int btnPin2 = 4;
 const int btnPin3 = 7;
 const int waterSensorPin = 5;
 const unsigned long oneMin = 60000; //1 min in millis
-const unsigned long sleepTime = 5*oneMin; //5 mins
+const unsigned long sleepTime = 5*oneMin; //5 mins 
+unsigned long prevMillis = 0;
+unsigned long prevMillis2 = 0;
 int btnState1 = 0;
 int btnState2 = 0;
 int btnState3 = 0;
@@ -45,6 +51,9 @@ int pageNum;
 int prevPageNum;
 bool disabled;
 bool needsRefill;
+bool tempTooLow;
+bool sleeping;
+float soilmoisture;
 
 void setup() {
   // put your setup code here, to run once:
@@ -57,6 +66,7 @@ void setup() {
   pinMode(TFT_BL, OUTPUT);
 
   tft.begin();
+  dht.begin();
 
   // read diagnostics (optional but can help debug problems)
   uint8_t x = tft.readcommand8(ILI9341_RDMODE);
@@ -102,25 +112,135 @@ void loop() {
         disabled = true;
         pageNum = 3;
         drawOptionsPages(pageNum);
-
       }
    }
    else {
-     checkWaterLevel();
+     checkWaterLevel(oneMin*10);
+     checkTempAndHum(oneMin*10);
+     checkSoilMoisture(oneMin*10);
+     sleepScreen(5000);
+
+    //if (btnState3 == HIGH && prevBtnState3 == LOW) {
+      wakeScreen();
+   // }
    }
 }
 
-void checkWaterLevel() { 
-  liquidlevel = digitalRead(waterSensorPin);
-  if (liquidlevel == 0 && prevlevel == 1) {
-    Serial.println("PLEASE REFILL");
-    drawRefillPage();
-    prevPageNum = pageNum;
-    pageNum = 4;
-    needsRefill = true;
-    disabled = false; 
+void checkSoilMoisture(unsigned long interval) {
+  unsigned long currMillis = millis();
+  float moisturepercent;
+
+  if (currMillis - prevMillis >= interval) {
+    prevMillis = currMillis;
+
+    if (pageNum == 1 || pageNum == 2 || pageNum == 3) {
+      // take 100 readings and average it for more stable data
+      for (int i=0; i<=100; i++) {
+        soilmoisture = soilmoisture + analogRead(MOISTURESENSORPIN);
+        delay(1);
+      }
+      soilmoisture = soilmoisture/100;
+
+      moisturepercent = (soilmoisture-110)*100L/(1023-110);
+      Serial.println(moisturepercent);
+
+      //placeholder nums
+      //if (soilmoisture < 0) {
+        //trigger water pump for X seconds
+     // }
+    }  
+  }
+}
+
+void checkTempAndHum(unsigned long interval) {
+  float h;
+  float t;
+  unsigned long currMillis = millis();
+
+  // Check if any reads failed and exit early (to try again).
+  // if (isnan(h) || isnan(t) || isnan(f)) {
+  //   Serial.println(F("Failed to read from DHT sensor!"));
+  //   return;
+  // }
+
+  if (currMillis - prevMillis >= interval) {
+    prevMillis = currMillis;
+    h = dht.readHumidity();
+    t = dht.readTemperature();
+
+    if (pageNum == 1) {
+      //placeholder nums
+      if (h < 10 || t < 25) {
+        //draw notif page for t/h too low 
+        prevPageNum = pageNum;
+        pageNum = 5;
+        drawTempHumPage();
+        disabled = false;
+        tempTooLow = true;
+      }
+    }
+    else if (pageNum == 2) {
+      //placeholder nums
+      if (h < 10 || t < 10) {
+        //draw notif page for t/h too low 
+        prevPageNum = pageNum;
+        pageNum = 5;
+        drawTempHumPage();
+        disabled = false;
+        tempTooLow = true;
+      }
+    }
+    else if (pageNum == 3) {
+      //placeholder nums
+      if (h < 10 || t < 10) {
+        //draw notif page for t/h too low 
+        prevPageNum = pageNum;
+        pageNum = 5;
+        drawTempHumPage();
+        disabled = false;
+        tempTooLow = true;
+      }
+    }
+    
+    Serial.print(("Humidity: "));
+    Serial.print(h);
+    Serial.print(("%  Temperature: "));
+    Serial.print(t);
+    Serial.print(("°C "));
+    Serial.println();
   }
 
+   // Serial.println(btnState3);
+    if (btnState3 == HIGH) {   
+     // Serial.println("here");
+      if (tempTooLow) {
+        Serial.println("msg dismissed");
+        tempTooLow = false; 
+        pageNum = prevPageNum;
+        drawOptionsPages(pageNum);
+      }
+  }
+  prevBtnState3 = btnState3;
+
+}
+
+void checkWaterLevel(unsigned long interval) { 
+  unsigned long currMillis = millis();
+
+  if (currMillis - prevMillis >= interval) {
+    prevMillis = currMillis;
+    liquidlevel = digitalRead(waterSensorPin);
+   // Serial.println(liquidlevel);
+
+    if (liquidlevel == 0 && prevlevel == 1) {
+      Serial.println("PLEASE REFILL");
+      drawRefillPage();
+      prevPageNum = pageNum;
+      pageNum = 4;
+      needsRefill = true;
+      disabled = false; 
+    }
+  }
   if (btnState3 == HIGH && prevBtnState3 == LOW) {   
     if (needsRefill && liquidlevel == HIGH) {
       Serial.println("msg dismissed");
@@ -128,10 +248,33 @@ void checkWaterLevel() {
       pageNum = prevPageNum;
       drawOptionsPages(pageNum);
     }
-  }
-  prevBtnState3 == btnState3;
+    }
+
+  prevBtnState3 = btnState3;
   prevlevel = liquidlevel;
   
+}
+
+void sleepScreen(unsigned long interval) {
+  unsigned long currMillis = millis();
+
+  if (currMillis - prevMillis > interval) {
+    if (pageNum == 1 || pageNum == 2 || pageNum == 3) {
+      analogWrite(TFT_BL, 10);  
+      disabled = false;
+      sleeping = true;
+    }
+  }
+}
+
+void wakeScreen() {
+  if (btnState3 == HIGH && prevBtnState3 == LOW) {
+    if (sleeping) {
+      analogWrite(TFT_BL, 50);  
+      disabled = true;
+    }
+  }
+ prevBtnState3 = btnState3; 
 }
 
 void drawHomePage() {
@@ -175,6 +318,15 @@ void drawRefillPage() {
   fillScreenBg(GREEN);
   drawBtn(10, 20, 300, 100, 25, WHITE, YELLOW);
   writeText(57, 62, "REFILL WATER TANK", BLACK);
+  drawBtn(75, 150, 170, 60, 25, YELLOW, BROWN);
+  writeText(137, 172, "DONE", BLACK);
+}
+
+void drawTempHumPage() {
+  fillScreenBg(GREEN);
+  drawBtn(10, 20, 300, 100, 25, WHITE, YELLOW);
+  writeText(25, 57, "TEMPERATURE OR HUMIDITY", BLACK);
+  writeText(120, 77, "TOO LOW", BLACK);
   drawBtn(75, 150, 170, 60, 25, YELLOW, BROWN);
   writeText(137, 172, "DONE", BLACK);
 }
