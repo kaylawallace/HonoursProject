@@ -120,19 +120,20 @@ void loop() {
    else {
     //checkWaterLevel(oneMin*10);
     //checkTempAndHum(oneMin*10);
-    checkSoilMoisture(oneMin);
-    waterPlant(5, 5);
+    checkSoilMoisture(5000);
+  //  waterPlant(5, 5);
    }
 }
 
-void waterPlant(unsigned long interval, unsigned long waterTime) {
+void waterPlant(unsigned long waterTime) {
   digitalWrite(PUMPPIN, HIGH);
   //digitalWrite(blinkPin, HIGH);
   delay(waterTime*1000);
+  Serial.println("working");
 
   digitalWrite(PUMPPIN, LOW);
  // digitalWrite(blinkPin, LOW);
-  delay(interval*1000);
+ // delay(interval*1000);
 }
 
 void checkSoilMoisture(unsigned long interval) {
@@ -150,13 +151,14 @@ void checkSoilMoisture(unsigned long interval) {
       }
       soilmoisture = soilmoisture/100;
 
-      moisturepercent = (soilmoisture-110)*100L/(1023-110);
-      Serial.println(moisturepercent);
+      // calculated with 650 instead of 1023 as average is never above ~650, even when submerged in water 
+      moisturepercent = map(soilmoisture, 0, 650, 0, 100);
+      //Serial.println(moisturepercent);
 
       //placeholder nums
-      if (soilmoisture < 25) {
+      if (moisturepercent < 20) {
         //trigger water pump for X seconds
-        waterPlant(10, 5);
+        waterPlant(30);
       }
     }  
   }
