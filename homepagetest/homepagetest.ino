@@ -12,6 +12,7 @@
 #define DHTTYPE DHT11 
 
 #define MOISTURESENSORPIN A0
+#define PUMPPIN A1
 
 #define GREEN    0x2BC9
 #define WHITE    0xFFFF
@@ -64,6 +65,8 @@ void setup() {
   pinMode(btnPin3, INPUT);
   pinMode(waterSensorPin, INPUT);
   pinMode(TFT_BL, OUTPUT);
+  pinMode(PUMPPIN, OUTPUT);
+ // pinMode(blinkPin, OUTPUT);
 
   tft.begin();
   dht.begin();
@@ -115,15 +118,21 @@ void loop() {
       }
    }
    else {
-     checkWaterLevel(oneMin*10);
-     checkTempAndHum(oneMin*10);
-     checkSoilMoisture(oneMin*10);
-     sleepScreen(5000);
-
-    //if (btnState3 == HIGH && prevBtnState3 == LOW) {
-      wakeScreen();
-   // }
+    //checkWaterLevel(oneMin*10);
+    //checkTempAndHum(oneMin*10);
+    checkSoilMoisture(oneMin);
+    waterPlant(5, 5);
    }
+}
+
+void waterPlant(unsigned long interval, unsigned long waterTime) {
+  digitalWrite(PUMPPIN, HIGH);
+  //digitalWrite(blinkPin, HIGH);
+  delay(waterTime*1000);
+
+  digitalWrite(PUMPPIN, LOW);
+ // digitalWrite(blinkPin, LOW);
+  delay(interval*1000);
 }
 
 void checkSoilMoisture(unsigned long interval) {
@@ -145,9 +154,10 @@ void checkSoilMoisture(unsigned long interval) {
       Serial.println(moisturepercent);
 
       //placeholder nums
-      //if (soilmoisture < 0) {
+      if (soilmoisture < 25) {
         //trigger water pump for X seconds
-     // }
+        waterPlant(10, 5);
+      }
     }  
   }
 }
