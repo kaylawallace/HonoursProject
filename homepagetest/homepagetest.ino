@@ -12,7 +12,7 @@
 #define DHTTYPE DHT11 
 
 #define MOISTURESENSORPIN A0
-#define PUMPPIN A1
+#define PUMPPIN A3
 
 #define GREEN    0x2BC9
 #define WHITE    0xFFFF
@@ -42,6 +42,7 @@ const unsigned long oneMin = 60000; //1 min in millis
 const unsigned long sleepTime = 5*oneMin; //5 mins 
 unsigned long prevMillis = 0;
 unsigned long prevMillis2 = 0;
+unsigned long prevMillis3 = 0;
 int btnState1 = 0;
 int btnState2 = 0;
 int btnState3 = 0;
@@ -55,6 +56,8 @@ bool needsRefill;
 bool tempTooLow;
 bool sleeping;
 float soilmoisture;
+bool refillTank;
+bool tempHumTooLow;
 
 void setup() {
   // put your setup code here, to run once:
@@ -118,22 +121,67 @@ void loop() {
       }
    }
    else {
-    //checkWaterLevel(oneMin*10);
-    //checkTempAndHum(oneMin*10);
-    checkSoilMoisture(5000);
+    checkWaterLevel(2000);
+    checkTempAndHum(60000);
+    checkSoilMoisture(30000);
+    
+    //tempTooLow = checkTempAndHum(5000);
+   // Serial.println(refillTank);
+    // if (refillTank) {      
+    //  // Serial.println(pageNum);
+    //   if (pageNum != 4) {
+    //     prevPageNum = pageNum;
+    //     drawRefillPage();
+    //     pageNum = 4;
+    //     d
+    //     isabled = false;
+    //   }     
+    //   if (btnState3 == HIGH && prevBtnState3 == LOW) {  
+    //    // Serial.println("here"); 
+    //     if (liquidlevel == HIGH && pageNum == 4) {
+    //       Serial.println("msg dismissed");
+    //       //needsRefill = false; 
+    //       pageNum = prevPageNum;
+    //       Serial.println(pageNum);
+    //       drawOptionsPages(pageNum);
+    //     }
+    //   }
+    //   prevBtnState3 = btnState3;
+    // }
+    
+    // if (tempHumTooLow) {
+    //    if (btnState3 == HIGH && pageNum == 5) {   
+    //  // Serial.println("here");
+    //  // if (tempTooLow) {
+    //     Serial.println("msg dismissed");
+    //     tempTooLow = false; 
+    //     pageNum = prevPageNum;
+    //     drawOptionsPages(pageNum);
+    //   //}
+    //   }
+    //   prevBtnState3 = btnState3;
+    // }
+   // else {
+     // if (pageNum != 4) {
+      // Serial.println("checkng")
+       // checkTempAndHum(5000);
+     // }
+   // }
+    //checkWaterLevel(oneMin);
+    
+    
+    //checkSoilMoisture(10000);
   //  waterPlant(5, 5);
    }
 }
 
+
 void waterPlant(unsigned long waterTime) {
   digitalWrite(PUMPPIN, HIGH);
-  //digitalWrite(blinkPin, HIGH);
-  delay(waterTime*1000);
-  Serial.println("working");
-
+  //Serial.println("working");
+  delay(waterTime*1000); 
   digitalWrite(PUMPPIN, LOW);
- // digitalWrite(blinkPin, LOW);
- // delay(interval*1000);
+  //Serial.println("done");
 }
 
 void checkSoilMoisture(unsigned long interval) {
@@ -153,13 +201,15 @@ void checkSoilMoisture(unsigned long interval) {
 
       // calculated with 650 instead of 1023 as average is never above ~650, even when submerged in water 
       moisturepercent = map(soilmoisture, 0, 650, 0, 100);
-      //Serial.println(moisturepercent);
+      Serial.print("Moisture Percent:");
+      Serial.print(moisturepercent);
+      Serial.println();
 
       //placeholder nums
-      if (moisturepercent < 20) {
-        //trigger water pump for X seconds
-        waterPlant(30);
-      }
+       if (moisturepercent < 20 && pageNum != 4) {
+      //   //trigger water pump for X seconds
+         waterPlant(10);
+       }
     }  
   }
 }
@@ -168,6 +218,7 @@ void checkTempAndHum(unsigned long interval) {
   float h;
   float t;
   unsigned long currMillis = millis();
+  //unsigned long prevMillis;
 
   // Check if any reads failed and exit early (to try again).
   // if (isnan(h) || isnan(t) || isnan(f)) {
@@ -175,10 +226,18 @@ void checkTempAndHum(unsigned long interval) {
   //   return;
   // }
 
-  if (currMillis - prevMillis >= interval) {
-    prevMillis = currMillis;
+  if (currMillis - prevMillis3 >= interval) {
+    prevMillis3 = currMillis;
     h = dht.readHumidity();
     t = dht.readTemperature();
+
+        
+    Serial.print(("Humidity: "));
+    Serial.print(h);
+    Serial.print(("%  Temperature: "));
+    Serial.print(t);
+    Serial.print(("°C "));
+    Serial.println();
 
     if (pageNum == 1) {
       //placeholder nums
@@ -204,7 +263,7 @@ void checkTempAndHum(unsigned long interval) {
     }
     else if (pageNum == 3) {
       //placeholder nums
-      if (h < 10 || t < 10) {
+      if (h < 10 || t < 50) {
         //draw notif page for t/h too low 
         prevPageNum = pageNum;
         pageNum = 5;
@@ -213,17 +272,10 @@ void checkTempAndHum(unsigned long interval) {
         tempTooLow = true;
       }
     }
-    
-    Serial.print(("Humidity: "));
-    Serial.print(h);
-    Serial.print(("%  Temperature: "));
-    Serial.print(t);
-    Serial.print(("°C "));
-    Serial.println();
   }
 
    // Serial.println(btnState3);
-    if (btnState3 == HIGH) {   
+    if (btnState3 == HIGH && pageNum == 5 && pageNum != 4) {   
      // Serial.println("here");
       if (tempTooLow) {
         Serial.println("msg dismissed");
@@ -239,28 +291,33 @@ void checkTempAndHum(unsigned long interval) {
 void checkWaterLevel(unsigned long interval) { 
   unsigned long currMillis = millis();
 
-  if (currMillis - prevMillis >= interval) {
-    prevMillis = currMillis;
+  if (currMillis - prevMillis2 >= interval) {
+    prevMillis2 = currMillis;
     liquidlevel = digitalRead(waterSensorPin);
-   // Serial.println(liquidlevel);
 
     if (liquidlevel == 0 && prevlevel == 1) {
-      Serial.println("PLEASE REFILL");
-      drawRefillPage();
-      prevPageNum = pageNum;
-      pageNum = 4;
       needsRefill = true;
-      disabled = false; 
+    }
+    else if (liquidlevel == 0 && prevlevel == 0) {
+      needsRefill = true;
     }
   }
+
+  if (needsRefill && pageNum != 4) {
+    prevPageNum = pageNum;
+    drawRefillPage();
+    pageNum = 4;
+  }
+
   if (btnState3 == HIGH && prevBtnState3 == LOW) {   
+    Serial.println("here");
     if (needsRefill && liquidlevel == HIGH) {
       Serial.println("msg dismissed");
       needsRefill = false; 
       pageNum = prevPageNum;
       drawOptionsPages(pageNum);
     }
-    }
+  }
 
   prevBtnState3 = btnState3;
   prevlevel = liquidlevel;
