@@ -180,7 +180,7 @@ void loop() {
    // checkTime();
 
     t = rtc.getTime();
-    TurnOnLEDs();
+    controlGrowLight();
 
 
    }
@@ -250,37 +250,50 @@ void checkTime() {
   delay(1000);
 }
 
-void TurnOnLEDs() {
-  unsigned long currMillis = millis();
-  int bOn = 255;
-  int bOff = 0;
+void controlGrowLight() {
+  //unsigned long currMillis = millis();
+  int rBright;
+  int bBright;
+  int wBright;
+  int offBright = 0;
+  int startHour;
+  int stopHour;
 
-  if (t.hour == 11 && t.min < 40) {
-    analogWrite(RED_LED, bOn);
-    analogWrite(BLUE_LED, bOn);
-    analogWrite(WHITE_LED, bOn);
+
+  if (pageNum == 1) {
+    startHour = 5;
+    stopHour = 23;
+    rBright = 100;
+    bBright = 255;
+    wBright = 150;
   }
-  else if (t.hour == 11 && t.min >= 40) {
-    analogWrite(RED_LED, bOff);
-    analogWrite(BLUE_LED, bOff);
-    analogWrite(WHITE_LED, bOff);
+  else if (pageNum == 2) {
+    startHour = 8;
+    stopHour = 22;
+    rBright = 150;
+    bBright = 255;
+    wBright = 150;
+  }
+  else if (pageNum == 3) {
+    startHour = 8;
+    stopHour = 22;
+    rBright = 255;
+    bBright = 200;
+    wBright = 150;
+  }
+
+  if (t.hour >= startHour && t.hour < stopHour) {
+    analogWrite(RED_LED, rBright);
+    analogWrite(BLUE_LED, bBright);
+    analogWrite(WHITE_LED, wBright);
+  }
+  else {
+    analogWrite(RED_LED, offBright);
+    analogWrite(BLUE_LED, offBright);
+    analogWrite(WHITE_LED, offBright);
   }
 }
 
-void TurnOffLEDs(unsigned long timeOff) {
-  unsigned long currMillis = millis();
-  int brightness = 0;
-
-  if (currMillis - prevMillis5 >= timeOff) {
-    prevMillis = currMillis;
-
-    analogWrite(RED_LED, brightness);
-   analogWrite(BLUE_LED, brightness);
-    analogWrite(WHITE_LED, brightness);
-
-  }
-
-}
 void waterPlant(unsigned long waterTime) {
   digitalWrite(PUMPPIN, HIGH);
   //Serial.println("working");
