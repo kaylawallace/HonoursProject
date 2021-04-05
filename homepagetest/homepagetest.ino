@@ -2,6 +2,8 @@
 #include "Adafruit_GFX.h"
 #include "Adafruit_ILI9341.h"
 #include "DHT.h"
+#include <DS3231.h>
+
 
 // For the Adafruit shield, these are the default.
 #define TFT_DC 30
@@ -14,11 +16,30 @@
 #define MOISTURESENSORPIN A0
 #define PUMPPIN A3
 
+#define RED_LED 6
+#define BLUE_LED 5
+#define GREEN_LED 10
+#define WHITE_LED 11
+int brightness = 255;
+int gBright = 0;
+int rBright = 0;
+int bBright = 0;
+int wBright = 0;
+int fadeSpeed = 10;
+
 #define GREEN    0x2BC9
 #define WHITE    0xFFFF
 #define YELLOW   0xEDAC 
 #define BROWN    0xA3A9
 #define BLACK    0x0000
+
+#define RTC_SDA 20
+#define RTC_SCL 21
+
+
+// Init the DS3231 using the hardware interface
+DS3231  rtc(RTC_SDA, RTC_SCL);
+Time t;
 
   // TODO: USE THIS TO DIM BACKLIGHT
   // analogWrite(TFT_BL, 10);   
@@ -37,12 +58,14 @@ DHT dht(DHTPIN, DHTTYPE);
 const int btnPin1 = 2;
 const int btnPin2 = 4;
 const int btnPin3 = 7;
-const int waterSensorPin = 5;
+const int waterSensorPin = 3;
 const unsigned long oneMin = 60000; //1 min in millis
 const unsigned long sleepTime = 5*oneMin; //5 mins 
 unsigned long prevMillis = 0;
 unsigned long prevMillis2 = 0;
 unsigned long prevMillis3 = 0;
+unsigned long prevMillis4 = 0;
+unsigned long prevMillis5 = 0;
 int btnState1 = 0;
 int btnState2 = 0;
 int btnState3 = 0;
@@ -69,10 +92,18 @@ void setup() {
   pinMode(waterSensorPin, INPUT);
   pinMode(TFT_BL, OUTPUT);
   pinMode(PUMPPIN, OUTPUT);
+  pinMode(TFT_DC, INPUT);
+  pinMode(TFT_CS, OUTPUT);
+  //pinMode(TFT_BL, INPUT);
+
+//   #define TFT_DC 30
+// #define TFT_CS 53
+// #define TFT_BL 9
  // pinMode(blinkPin, OUTPUT);
 
   tft.begin();
   dht.begin();
+  rtc.begin();
 
   // read diagnostics (optional but can help debug problems)
   uint8_t x = tft.readcommand8(ILI9341_RDMODE);
@@ -89,12 +120,31 @@ void setup() {
   tft.setRotation(1);
   tft.setTextSize(2);
   tft.setFont();
+
+   pinMode(GREEN_LED, OUTPUT);
+   pinMode(RED_LED, OUTPUT);
+   pinMode(BLUE_LED, OUTPUT);
+   pinMode(WHITE_LED, OUTPUT);
+
+  //  rtc.setDOW(MONDAY);
+  //  rtc.setTime(10, 36, 0);
+  //  rtc.setDate(5, 4, 2021);
   
+  // rtc.setTime(__TIME__);
+  // rtc.setDate(__DATE__);
+
   drawHomePage();
+
+  // TurnOnLEDs();
+  // delay(1000);
+  // TurnOffLEDs();
 }
 
 void loop() {
    // put your main code here, to run repeatedly:
+  
+  
+  
    btnState1 = digitalRead(btnPin1);
    btnState2 = digitalRead(btnPin2);
    btnState3 = digitalRead(btnPin3);
@@ -124,6 +174,17 @@ void loop() {
     checkWaterLevel(2000);
     checkTempAndHum(60000);
     checkSoilMoisture(30000);
+
+   // TurnOnLEDs(oneMin/6);
+
+   // checkTime();
+
+    t = rtc.getTime();
+    TurnOnLEDs();
+
+
+   }
+
     
     //tempTooLow = checkTempAndHum(5000);
    // Serial.println(refillTank);
@@ -172,10 +233,54 @@ void loop() {
     
     //checkSoilMoisture(10000);
   //  waterPlant(5, 5);
-   }
+  // }
 }
 
+void checkTime() {
 
+  Serial.print(rtc.getDOWStr());
+  Serial.print(" ");
+
+  Serial.print(rtc.getDateStr());
+  Serial.print(" -- ");
+
+  Serial.print(rtc.getTimeStr());
+  Serial.println(); 
+
+  delay(1000);
+}
+
+void TurnOnLEDs() {
+  unsigned long currMillis = millis();
+  int bOn = 255;
+  int bOff = 0;
+
+  if (t.hour == 11 && t.min < 40) {
+    analogWrite(RED_LED, bOn);
+    analogWrite(BLUE_LED, bOn);
+    analogWrite(WHITE_LED, bOn);
+  }
+  else if (t.hour == 11 && t.min >= 40) {
+    analogWrite(RED_LED, bOff);
+    analogWrite(BLUE_LED, bOff);
+    analogWrite(WHITE_LED, bOff);
+  }
+}
+
+void TurnOffLEDs(unsigned long timeOff) {
+  unsigned long currMillis = millis();
+  int brightness = 0;
+
+  if (currMillis - prevMillis5 >= timeOff) {
+    prevMillis = currMillis;
+
+    analogWrite(RED_LED, brightness);
+   analogWrite(BLUE_LED, brightness);
+    analogWrite(WHITE_LED, brightness);
+
+  }
+
+}
 void waterPlant(unsigned long waterTime) {
   digitalWrite(PUMPPIN, HIGH);
   //Serial.println("working");
