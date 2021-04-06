@@ -4,68 +4,55 @@
 #include "DHT.h"
 #include <DS3231.h>
 
-
-// For the Adafruit shield, these are the default.
+// TFT LCD screen pin definitions
 #define TFT_DC 30
 #define TFT_CS 53
 #define TFT_BL 11
 
+// Temperature/Humidity sensor definitions
 #define DHTPIN 24
 #define DHTTYPE DHT11 
 
+// Soil moisture sensor, water pump & water level sensor pin definitions
 #define MOISTURESENSORPIN A0
 #define PUMPPIN A3
+#define WATERLVL 3
 
+// Pin definitions for each LED colour from the grow light 
 #define RED_LED 6
 #define BLUE_LED 5
 #define GREEN_LED 10
 #define WHITE_LED 9
-int brightness = 255;
-int gBright = 0;
-int rBright = 0;
-int bBright = 0;
-int wBright = 0;
-int fadeSpeed = 10;
 
+// Real-time clock module pin definitions 
+#define RTC_SDA 20
+#define RTC_SCL 21
+
+// Colour definitions for drawing the UI on the TFT LCD screen
 #define GREEN    0x2BC9
 #define WHITE    0xFFFF
 #define YELLOW   0xEDAC 
 #define BROWN    0xA3A9
 #define BLACK    0x0000
 
-#define RTC_SDA 20
-#define RTC_SCL 21
+#define BTN1 2
+#define BTN2 4
+#define BTN3 7 
 
+// Initialise screen using Adafruit class library
+Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_BL);
 
-// Init the DS3231 using the hardware interface
+// Initialise temperature/humidity sensor var using DHT class library
+DHT dht(DHTPIN, DHTTYPE);
+
+// Initialise real-time clock module vars using the DS3231 class library
 DS3231  rtc(RTC_SDA, RTC_SCL);
 Time t;
 
-  // TODO: USE THIS TO DIM BACKLIGHT
-  // analogWrite(TFT_BL, 10);   
-
-  // could be useful?
-  // tft.readcommand8(ILI9341_DISPON);
-
-// Use hardware SPI (on Uno, #13, #12, #11) and the above for CS/DC
-Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_BL);
-// If using the breakout, change pins as desired
-//Adafruit_ILI9341 tft = Adafruit_ILI
-//9341(TFT_CS, TFT_DC, TFT_MOSI, TFT_CLK, TFT_RST, TFT_MISO);
-GFXcanvas1 canvas(200, 50);
-DHT dht(DHTPIN, DHTTYPE);
-
-const int btnPin1 = 2;
-const int btnPin2 = 4;
-const int btnPin3 = 7;
-const int waterSensorPin = 3;
 const unsigned long oneMin = 60000; //1 min in millis
-const unsigned long sleepTime = 5*oneMin; //5 mins 
 unsigned long prevMillis = 0;
 unsigned long prevMillis2 = 0;
 unsigned long prevMillis3 = 0;
-unsigned long prevMillis4 = 0;
-unsigned long prevMillis5 = 0;
 unsigned long prevMillis6 = 0;
 int btnState1 = 0;
 int btnState2 = 0;
@@ -75,122 +62,93 @@ int liquidlevel = 0;
 int prevlevel = 0;
 int pageNum; 
 int prevPageNum;
-bool disabled;
-bool needsRefill;
-bool tempTooLow;
-bool sleeping;
-float soilmoisture;
-bool refillTank;
-bool tempHumTooLow;
+bool disabled;      // True when buttons are disabled 
+bool needsRefill;   // True when the water tank needs refilled
+bool tempTooLow;    // True when the air temp./humidity is too low
+bool sleeping;      // True when the screen is dimmed
+float soilmoisture; // Value read in from soil moisture sensor  
 
 void setup() {
-  // put your setup code here, to run once:
   Serial.begin(9600);
-  Serial.println("Home page test!"); 
-  pinMode(btnPin1, INPUT);
-  pinMode(btnPin2, INPUT);
-  pinMode(btnPin3, INPUT);
-  pinMode(waterSensorPin, INPUT);
+  pinMode(BTN1, INPUT);
+  pinMode(BTN2, INPUT);
+  pinMode(BTN3, INPUT);
+  pinMode(WATERLVL, INPUT);  
+  pinMode(PUMPPIN, OUTPUT);  
+  pinMode(GREEN_LED, OUTPUT);
+  pinMode(RED_LED, OUTPUT);
+  pinMode(BLUE_LED, OUTPUT);
+  pinMode(WHITE_LED, OUTPUT);
   pinMode(TFT_BL, OUTPUT);
-  pinMode(PUMPPIN, OUTPUT);
-  pinMode(TFT_DC, INPUT);
-  pinMode(TFT_CS, OUTPUT);
-  //pinMode(TFT_BL, INPUT);
-
-//   #define TFT_DC 30
-// #define TFT_CS 53
-// #define TFT_BL 9
- // pinMode(blinkPin, OUTPUT);
 
   tft.begin();
   dht.begin();
   rtc.begin();
 
-  // read diagnostics (optional but can help debug problems)
-  uint8_t x = tft.readcommand8(ILI9341_RDMODE);
-  Serial.print("Display Power Mode: 0x"); Serial.println(x, HEX);
-  x = tft.readcommand8(ILI9341_RDMADCTL);
-  Serial.print("MADCTL Mode: 0x"); Serial.println(x, HEX);
-  x = tft.readcommand8(ILI9341_RDPIXFMT);
-  Serial.print("Pixel Format: 0x"); Serial.println(x, HEX);
-  x = tft.readcommand8(ILI9341_RDIMGFMT);
-  Serial.print("Image Format: 0x"); Serial.println(x, HEX);
-  x = tft.readcommand8(ILI9341_RDSELFDIAG);
-  Serial.print("Self Diagnostic: 0x"); Serial.println(x, HEX); 
+  //Serial.println("Screen Diagnostics"); 
+  // Read diagnostics (optional but can help debug problems)
+  // uint8_t x = tft.readcommand8(ILI9341_RDMODE);
+  // Serial.print("Display Power Mode: 0x"); Serial.println(x, HEX);
+  // x = tft.readcommand8(ILI9341_RDMADCTL);
+  // Serial.print("MADCTL Mode: 0x"); Serial.println(x, HEX);
+  // x = tft.readcommand8(ILI9341_RDPIXFMT);
+  // Serial.print("Pixel Format: 0x"); Serial.println(x, HEX);
+  // x = tft.readcommand8(ILI9341_RDIMGFMT);
+  // Serial.print("Image Format: 0x"); Serial.println(x, HEX);
+  // x = tft.readcommand8(ILI9341_RDSELFDIAG);
+  // Serial.print("Self Diagnostic: 0x"); Serial.println(x, HEX); 
 
+  // Set the screen defaults 
   tft.setRotation(1);
   tft.setTextSize(2);
-  tft.setFont();
-
-   pinMode(GREEN_LED, OUTPUT);
-   pinMode(RED_LED, OUTPUT);
-   pinMode(BLUE_LED, OUTPUT);
-   pinMode(WHITE_LED, OUTPUT);
-
-  //  rtc.setDOW(MONDAY);
-  //  rtc.setTime(10, 36, 0);
-  //  rtc.setDate(5, 4, 2021);
-  
-  // rtc.setTime(__TIME__);
-  // rtc.setDate(__DATE__);
 
   drawHomePage();
-
-  // TurnOnLEDs();
-  // delay(1000);
-  // TurnOffLEDs();
 }
 
 void loop() {
-   // put your main code here, to run repeatedly:
-  
-  
-  
-   btnState1 = digitalRead(btnPin1);
-   btnState2 = digitalRead(btnPin2);
-   btnState3 = digitalRead(btnPin3);
+  btnState1 = digitalRead(BTN1);
+  btnState2 = digitalRead(BTN2);
+  btnState3 = digitalRead(BTN3);
 
-   // only run this section if current page = home page 
-   if (pageNum == 0) {
-      if (btnState1 == HIGH && !disabled) {
-          Serial.println("btn 1");
-          disabled = true;
-          pageNum = 1;
-          drawOptionsPages(pageNum);
-      }
-      if (btnState2 == HIGH && !disabled) {
-        Serial.println("btn 2");
+  // Only run this section if current page = home page 
+  // Set disabled to true once an option has been picked so that the buttons only work when intended to 
+  if (pageNum == 0) {
+    if (btnState1 == HIGH && !disabled) {
         disabled = true;
-        pageNum = 2;
+        pageNum = 1;
         drawOptionsPages(pageNum);
-      }
-      if (btnState3 == HIGH && !disabled) {
-        Serial.println("btn 3");
-        disabled = true;
-        pageNum = 3;
-        drawOptionsPages(pageNum);
-      }
-   }
-   else {
-    t = rtc.getTime();
-    
-    checkWaterLevel(2000);
-    checkTempAndHum(60000);
-    checkSoilMoisture(30000);   
+    }
+    if (btnState2 == HIGH && !disabled) {
+      disabled = true;
+      pageNum = 2;
+      drawOptionsPages(pageNum);
+    }
+    if (btnState3 == HIGH && !disabled) {
+      disabled = true;
+      pageNum = 3;
+      drawOptionsPages(pageNum);
+    }
+  }
+  // When on any other page except the home page - run the sensors
+  else {   
+    checkWaterLevel(oneMin/3);
+    checkTempAndHum(oneMin);
+    checkSoilMoisture(oneMin/2);   
     controlGrowLight();
 
-    // button 1 acts as back to homepage button when having selected option 1/2/3
+    sleepScreen(oneMin*15);
+    wakeScreen();
+
+    // Button 1 acts as back to homepage button when on pages 1/2/3
     if (btnState1 == HIGH) {
       pageNum = 0;
       disabled = false;
       drawHomePage();
     }
-
-    sleepScreen(oneMin*15);
-    wakeScreen();
-   }
+  }
 }
 
+// Test method to output current day of week, date, and time received from RTC module
 void checkTime() {
   Serial.print(rtc.getDOWStr());
   Serial.print(" ");
@@ -204,14 +162,20 @@ void checkTime() {
   delay(1000);
 }
 
+/*
+* Method to turn the LED grow lights on/off based on the type of plant option chosen on the home page 
+*/
 void controlGrowLight() {
-  int rBright;
-  int bBright;
-  int wBright;
-  int offBright = 0;
-  int startHour;
-  int stopHour;
+  int rBright;        // Brightness of red LED
+  int bBright;        // Brightness of blue LED
+  int wBright;        // Brightness of white LED 
+  int offBright = 0;  // Brightness when LEDs are off (0)
+  int startHour;      // Hour the LEDs should turn on 
+  int stopHour;       // Hour the LEDs should turn off 
 
+  t = rtc.getTime();
+
+  // Set each brightness & start/stop hour for each page - values specific to type of plant being grown 
   if (pageNum == 1) {
     startHour = 5;
     stopHour = 23;
@@ -246,12 +210,22 @@ void controlGrowLight() {
   }
 }
 
+/*
+* Method to turn the water pump on for a specific amount of time and then off again after that time is up
+* Param: waterTime - the number of seconds the water pump should be turned on for 
+*/
 void waterPlant(unsigned long waterTime) {
   digitalWrite(PUMPPIN, HIGH);
   delay(waterTime*1000); 
   digitalWrite(PUMPPIN, LOW);
 }
 
+/*
+* Method to check the current soil moisture levels, convert these to a percentage value,
+* and call the waterPlant method if the soil moisture is too low based on the type of plant option 
+* chosen on the home page 
+* Param: interval - the number of millis that are to pass before the function runs (time delay between sensor readings)
+*/
 void checkSoilMoisture(unsigned long interval) {
   unsigned long currMillis = millis();
   float moisturepercent;
@@ -267,40 +241,38 @@ void checkSoilMoisture(unsigned long interval) {
       }
       soilmoisture = soilmoisture/100;
 
-      // calculated with 650 instead of 1023 as average is never above ~650, even when submerged in water 
+      // Calculate soil moisture percentage from average reading 
+      // Using 650 instead of 1023 as a result of testing with the sensor
       moisturepercent = map(soilmoisture, 0, 650, 0, 100);
-      Serial.print("Moisture Percent:");
-      Serial.print(moisturepercent);
-      Serial.println();
 
-      //placeholder nums
-       if (moisturepercent < 20 && pageNum != 4) {
-      //   //trigger water pump for X seconds
-         waterPlant(10);
-       }
-
-       if (pageNum == 1) {
-         if (moisturepercent < 50) {
-           waterPlant(oneMin);
-         }
-       }
-       else if (pageNum == 2) {
-         if (moisturepercent < 35) {
-           waterPlant(oneMin);
-         }
-       }
-       else if (pageNum == 3) {
-         if (moisturepercent < 20) {
-           waterPlant(oneMin*1.5);
-         }
-       }
+      // Set the moisture threshold specific to each page/type of plant being grown
+      if (pageNum == 1) {
+        if (moisturepercent < 80) {
+          waterPlant(oneMin);
+        }
+      }
+      else if (pageNum == 2) {
+        if (moisturepercent < 70) {
+          waterPlant(oneMin);
+        }
+      }
+      else if (pageNum == 3) {
+        if (moisturepercent < 60) {
+          waterPlant(oneMin*1.5);
+        }
+      }
     }  
   }
 }
 
+/*
+* Method to check the current air temperature and humidity and to notify the user if these readings are 
+* too low based on the type of plant option chosen on the home page 
+* Param: interval - the number of millis that are to pass before the function runs (time delay between sensor readings)
+*/
 void checkTempAndHum(unsigned long interval) {
-  float h;
-  float t;
+  float h;   // Humidity reading
+  float t;   // Temperature reading 
   unsigned long currMillis = millis();
 
   if (currMillis - prevMillis3 >= interval) {
@@ -308,16 +280,16 @@ void checkTempAndHum(unsigned long interval) {
     h = dht.readHumidity();
     t = dht.readTemperature();
        
-    Serial.print(("Humidity: "));
-    Serial.print(h);
-    Serial.print(("%  Temperature: "));
-    Serial.print(t);
-    Serial.print(("°C "));
-    Serial.println();
+    // Serial.print(("Humidity: "));
+    // Serial.print(h);
+    // Serial.print(("%  Temperature: "));
+    // Serial.print(t);
+    // Serial.print(("°C "));
+    // Serial.println();
 
+    // Set temperature and humidity thresholds specific to the type of plant being grown 
     if (pageNum == 1) {
       if (h < 70 || t < 25) {
-        //draw notif page for t/h too low 
         prevPageNum = pageNum;
         pageNum = 5;
         drawTempHumPage();
@@ -327,7 +299,6 @@ void checkTempAndHum(unsigned long interval) {
     }
     else if (pageNum == 2) {
       if (h < 50 || t < 20) {
-        //draw notif page for t/h too low 
         prevPageNum = pageNum;
         pageNum = 5;
         drawTempHumPage();
@@ -337,7 +308,6 @@ void checkTempAndHum(unsigned long interval) {
     }
     else if (pageNum == 3) {
       if (h < 60 || t < 20) {
-        //draw notif page for t/h too low 
         prevPageNum = pageNum;
         pageNum = 5;
         drawTempHumPage();
@@ -347,26 +317,27 @@ void checkTempAndHum(unsigned long interval) {
     }
   }
 
-   // Serial.println(btnState3);
-    if (btnState3 == HIGH && pageNum == 5 && pageNum != 4) {   
-     // Serial.println("here");
-      if (tempTooLow) {
-        Serial.println("msg dismissed");
-        tempTooLow = false; 
-        pageNum = prevPageNum;
-        drawOptionsPages(pageNum);
-      }
+  // Dismiss the notification displayed when the temp./humidity is too low 
+  if (btnState3 == HIGH && pageNum == 5 && pageNum != 4) {   
+    if (tempTooLow) {
+      tempTooLow = false; 
+      pageNum = prevPageNum;
+      drawOptionsPages(pageNum);
+    }
   }
   prevBtnState3 = btnState3;
-
 }
 
+/*
+* Method to check the current water level of the built-in water tank and notify the user if it needs refilled 
+* Param: interval - the number of millis that are to pass before the function runs (time delay between sensor readings)
+*/
 void checkWaterLevel(unsigned long interval) { 
   unsigned long currMillis = millis();
 
   if (currMillis - prevMillis2 >= interval) {
     prevMillis2 = currMillis;
-    liquidlevel = digitalRead(waterSensorPin);
+    liquidlevel = digitalRead(WATERLVL);
 
     if (liquidlevel == 0 && prevlevel == 1) {
       needsRefill = true;
@@ -376,16 +347,16 @@ void checkWaterLevel(unsigned long interval) {
     }
   }
 
+  // Only display the notification if it is not already shown 
   if (needsRefill && pageNum != 4) {
     prevPageNum = pageNum;
     drawRefillPage();
     pageNum = 4;
   }
 
+  // Dismiss the notification displayed if the water tank needs refilled 
   if (btnState3 == HIGH && prevBtnState3 == LOW) {   
-    Serial.println("here");
     if (needsRefill && liquidlevel == HIGH) {
-      Serial.println("msg dismissed");
       needsRefill = false; 
       pageNum = prevPageNum;
       drawOptionsPages(pageNum);
@@ -393,10 +364,14 @@ void checkWaterLevel(unsigned long interval) {
   }
 
   prevBtnState3 = btnState3;
-  prevlevel = liquidlevel;
-  
+  prevlevel = liquidlevel; 
 }
 
+/*
+* Method to dim the backlight of the LCD screen to enter a 'sleep' state if an amount of time has passed with no activity
+* on pages 1, 2 or 3
+* Param: interval - the number of millis that are to pass before the function runs (time delay between sensor readings)
+*/
 void sleepScreen(unsigned long interval) {
   unsigned long currMillis = millis();
 
@@ -410,6 +385,9 @@ void sleepScreen(unsigned long interval) {
   }
 }
 
+/*
+* Method to return the backlight to full brightness if the user presses a button to exit the 'sleep' state 
+*/
 void wakeScreen() {
   if (btnState3 == HIGH) {
     if (sleeping) {
@@ -420,6 +398,9 @@ void wakeScreen() {
  prevBtnState3 = btnState3; 
 }
 
+/*
+* Method to draw the home page on the LCD screen
+*/
 void drawHomePage() {
   pageNum = 0;
   fillScreenBg(GREEN);
@@ -436,6 +417,10 @@ void drawHomePage() {
   writeText(40, 200, "sun-loving fruit/veg", BLACK);
 }
 
+/*
+* Method to draw each options on the LCD screen
+* Param: pageNum - the page number corresponding to the type of plant option chosen by the user on the home page 
+*/
 void drawOptionsPages(int pageNum) {
   if (pageNum == 1) {
     fillScreenBg(GREEN);
@@ -457,6 +442,9 @@ void drawOptionsPages(int pageNum) {
   }
 }
 
+/*
+* Method to draw the refill water tank notification page on the LCD screen
+*/
 void drawRefillPage() {
   fillScreenBg(GREEN);
   drawBtn(10, 20, 300, 100, 25, WHITE, YELLOW);
@@ -465,6 +453,9 @@ void drawRefillPage() {
   writeText(137, 172, "DONE", BLACK);
 }
 
+/*
+* Method to draw the notification paage for if the temperature or humidity are too low on the LCD screen
+*/
 void drawTempHumPage() {
   fillScreenBg(GREEN);
   drawBtn(10, 20, 300, 100, 25, WHITE, YELLOW);
@@ -474,10 +465,19 @@ void drawTempHumPage() {
   writeText(137, 172, "DONE", BLACK);
 }
 
+/*
+* Method to colour fill the background of the LCD screen
+* Param: colour - colour to fill the background 
+*/
 void fillScreenBg(uint16_t colour) {
   tft.fillScreen(colour);
 }
 
+/*
+* Method to draw a message box on the LCD screen
+* Params: x0 - starting x-position, y0 - starting y-position, w - width, h - height, outline_col = outline colour
+* Optional: fill_col - fill colour 
+*/
 void drawMsgBox(uint16_t x0, uint16_t y0, uint16_t w, uint16_t h, uint16_t r, uint16_t fill_col, uint16_t outline_col) {
  if (fill_col != NULL) {
   tft.fillRoundRect(x0, y0, w, h, r, fill_col);
@@ -488,11 +488,19 @@ void drawMsgBox(uint16_t x0, uint16_t y0, uint16_t w, uint16_t h, uint16_t r, ui
  }
 }
 
+/*
+* Method to draw a button on the LCD screen
+* Params: x0 - starting x-position, y0 - starting y-position, w - width, h - height, fill_col - fill colour, outline_col = outline colour
+*/
 void drawBtn(uint16_t x0, uint16_t y0, uint16_t w, uint16_t h, uint16_t r, uint16_t fill_col, uint16_t outline_col) {
   tft.fillRoundRect(x0, y0, w, h, r, fill_col);
   tft.drawRoundRect(x0, y0, w, h, r, outline_col);
 }
 
+/*
+* Method to write text on the LCD screen
+* Params: cursor_x - starting x-position, cursor_y - starting y-position, text - text to be written, font_col - font colour
+*/
 void writeText(uint16_t cursor_x, uint16_t cursor_y, String text, uint16_t font_col) {  
   tft.setTextColor(font_col);  
   tft.setCursor(cursor_x, cursor_y);
