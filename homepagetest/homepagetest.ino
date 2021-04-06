@@ -8,7 +8,7 @@
 // For the Adafruit shield, these are the default.
 #define TFT_DC 30
 #define TFT_CS 53
-#define TFT_BL 9
+#define TFT_BL 11
 
 #define DHTPIN 24
 #define DHTTYPE DHT11 
@@ -19,7 +19,7 @@
 #define RED_LED 6
 #define BLUE_LED 5
 #define GREEN_LED 10
-#define WHITE_LED 11
+#define WHITE_LED 9
 int brightness = 255;
 int gBright = 0;
 int rBright = 0;
@@ -66,6 +66,7 @@ unsigned long prevMillis2 = 0;
 unsigned long prevMillis3 = 0;
 unsigned long prevMillis4 = 0;
 unsigned long prevMillis5 = 0;
+unsigned long prevMillis6 = 0;
 int btnState1 = 0;
 int btnState2 = 0;
 int btnState3 = 0;
@@ -171,73 +172,26 @@ void loop() {
       }
    }
    else {
+    t = rtc.getTime();
+    
     checkWaterLevel(2000);
     checkTempAndHum(60000);
-    checkSoilMoisture(30000);
-
-   // TurnOnLEDs(oneMin/6);
-
-   // checkTime();
-
-    t = rtc.getTime();
+    checkSoilMoisture(30000);   
     controlGrowLight();
 
+    // button 1 acts as back to homepage button when having selected option 1/2/3
+    if (btnState1 == HIGH) {
+      pageNum = 0;
+      disabled = false;
+      drawHomePage();
+    }
 
+    sleepScreen(oneMin*15);
+    wakeScreen();
    }
-
-    
-    //tempTooLow = checkTempAndHum(5000);
-   // Serial.println(refillTank);
-    // if (refillTank) {      
-    //  // Serial.println(pageNum);
-    //   if (pageNum != 4) {
-    //     prevPageNum = pageNum;
-    //     drawRefillPage();
-    //     pageNum = 4;
-    //     d
-    //     isabled = false;
-    //   }     
-    //   if (btnState3 == HIGH && prevBtnState3 == LOW) {  
-    //    // Serial.println("here"); 
-    //     if (liquidlevel == HIGH && pageNum == 4) {
-    //       Serial.println("msg dismissed");
-    //       //needsRefill = false; 
-    //       pageNum = prevPageNum;
-    //       Serial.println(pageNum);
-    //       drawOptionsPages(pageNum);
-    //     }
-    //   }
-    //   prevBtnState3 = btnState3;
-    // }
-    
-    // if (tempHumTooLow) {
-    //    if (btnState3 == HIGH && pageNum == 5) {   
-    //  // Serial.println("here");
-    //  // if (tempTooLow) {
-    //     Serial.println("msg dismissed");
-    //     tempTooLow = false; 
-    //     pageNum = prevPageNum;
-    //     drawOptionsPages(pageNum);
-    //   //}
-    //   }
-    //   prevBtnState3 = btnState3;
-    // }
-   // else {
-     // if (pageNum != 4) {
-      // Serial.println("checkng")
-       // checkTempAndHum(5000);
-     // }
-   // }
-    //checkWaterLevel(oneMin);
-    
-    
-    //checkSoilMoisture(10000);
-  //  waterPlant(5, 5);
-  // }
 }
 
 void checkTime() {
-
   Serial.print(rtc.getDOWStr());
   Serial.print(" ");
 
@@ -251,14 +205,12 @@ void checkTime() {
 }
 
 void controlGrowLight() {
-  //unsigned long currMillis = millis();
   int rBright;
   int bBright;
   int wBright;
   int offBright = 0;
   int startHour;
   int stopHour;
-
 
   if (pageNum == 1) {
     startHour = 5;
@@ -296,10 +248,8 @@ void controlGrowLight() {
 
 void waterPlant(unsigned long waterTime) {
   digitalWrite(PUMPPIN, HIGH);
-  //Serial.println("working");
   delay(waterTime*1000); 
   digitalWrite(PUMPPIN, LOW);
-  //Serial.println("done");
 }
 
 void checkSoilMoisture(unsigned long interval) {
@@ -328,6 +278,22 @@ void checkSoilMoisture(unsigned long interval) {
       //   //trigger water pump for X seconds
          waterPlant(10);
        }
+
+       if (pageNum == 1) {
+         if (moisturepercent < 50) {
+           waterPlant(oneMin);
+         }
+       }
+       else if (pageNum == 2) {
+         if (moisturepercent < 35) {
+           waterPlant(oneMin);
+         }
+       }
+       else if (pageNum == 3) {
+         if (moisturepercent < 20) {
+           waterPlant(oneMin*1.5);
+         }
+       }
     }  
   }
 }
@@ -336,20 +302,12 @@ void checkTempAndHum(unsigned long interval) {
   float h;
   float t;
   unsigned long currMillis = millis();
-  //unsigned long prevMillis;
-
-  // Check if any reads failed and exit early (to try again).
-  // if (isnan(h) || isnan(t) || isnan(f)) {
-  //   Serial.println(F("Failed to read from DHT sensor!"));
-  //   return;
-  // }
 
   if (currMillis - prevMillis3 >= interval) {
     prevMillis3 = currMillis;
     h = dht.readHumidity();
     t = dht.readTemperature();
-
-        
+       
     Serial.print(("Humidity: "));
     Serial.print(h);
     Serial.print(("%  Temperature: "));
@@ -358,8 +316,7 @@ void checkTempAndHum(unsigned long interval) {
     Serial.println();
 
     if (pageNum == 1) {
-      //placeholder nums
-      if (h < 10 || t < 25) {
+      if (h < 70 || t < 25) {
         //draw notif page for t/h too low 
         prevPageNum = pageNum;
         pageNum = 5;
@@ -369,8 +326,7 @@ void checkTempAndHum(unsigned long interval) {
       }
     }
     else if (pageNum == 2) {
-      //placeholder nums
-      if (h < 10 || t < 10) {
+      if (h < 50 || t < 20) {
         //draw notif page for t/h too low 
         prevPageNum = pageNum;
         pageNum = 5;
@@ -380,8 +336,7 @@ void checkTempAndHum(unsigned long interval) {
       }
     }
     else if (pageNum == 3) {
-      //placeholder nums
-      if (h < 10 || t < 50) {
+      if (h < 60 || t < 20) {
         //draw notif page for t/h too low 
         prevPageNum = pageNum;
         pageNum = 5;
@@ -445,8 +400,9 @@ void checkWaterLevel(unsigned long interval) {
 void sleepScreen(unsigned long interval) {
   unsigned long currMillis = millis();
 
-  if (currMillis - prevMillis > interval) {
+  if (currMillis - prevMillis6 > interval) {
     if (pageNum == 1 || pageNum == 2 || pageNum == 3) {
+      prevMillis6 = currMillis;
       analogWrite(TFT_BL, 10);  
       disabled = false;
       sleeping = true;
@@ -455,9 +411,9 @@ void sleepScreen(unsigned long interval) {
 }
 
 void wakeScreen() {
-  if (btnState3 == HIGH && prevBtnState3 == LOW) {
+  if (btnState3 == HIGH) {
     if (sleeping) {
-      analogWrite(TFT_BL, 50);  
+      analogWrite(TFT_BL, 100);  
       disabled = true;
     }
   }
@@ -523,7 +479,6 @@ void fillScreenBg(uint16_t colour) {
 }
 
 void drawMsgBox(uint16_t x0, uint16_t y0, uint16_t w, uint16_t h, uint16_t r, uint16_t fill_col, uint16_t outline_col) {
- 
  if (fill_col != NULL) {
   tft.fillRoundRect(x0, y0, w, h, r, fill_col);
   tft.drawRoundRect(x0, y0, w, h, r, outline_col);
@@ -531,7 +486,6 @@ void drawMsgBox(uint16_t x0, uint16_t y0, uint16_t w, uint16_t h, uint16_t r, ui
  else {
   tft.drawRoundRect(x0, y0, w, h, r, outline_col);
  }
- 
 }
 
 void drawBtn(uint16_t x0, uint16_t y0, uint16_t w, uint16_t h, uint16_t r, uint16_t fill_col, uint16_t outline_col) {
