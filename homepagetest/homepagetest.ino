@@ -102,7 +102,8 @@ void setup() {
   tft.setRotation(1);
   tft.setTextSize(2);
 
-  drawHomePage();
+  pageNum = 0;
+  drawPage(pageNum);
 }
 
 void loop() {
@@ -116,17 +117,17 @@ void loop() {
     if (btnState1 == HIGH && !disabled) {
         disabled = true;
         pageNum = 1;
-        drawOptionsPages(pageNum);
+        drawPage(pageNum);
     }
     if (btnState2 == HIGH && !disabled) {
       disabled = true;
       pageNum = 2;
-      drawOptionsPages(pageNum);
+      drawPage(pageNum);
     }
     if (btnState3 == HIGH && !disabled) {
       disabled = true;
       pageNum = 3;
-      drawOptionsPages(pageNum);
+      drawPage(pageNum);
     }
   }
   // When on any other page except the home page - run the sensors
@@ -143,7 +144,7 @@ void loop() {
     if (btnState1 == HIGH) {
       pageNum = 0;
       disabled = false;
-      drawHomePage();
+      drawPage(pageNum);
     }
   }
 }
@@ -292,7 +293,7 @@ void checkTempAndHum(unsigned long interval) {
       if (h < 70 || t < 25) {
         prevPageNum = pageNum;
         pageNum = 5;
-        drawTempHumPage();
+        drawPage(pageNum);
         disabled = false;
         tempTooLow = true;
       }
@@ -301,7 +302,7 @@ void checkTempAndHum(unsigned long interval) {
       if (h < 50 || t < 20) {
         prevPageNum = pageNum;
         pageNum = 5;
-        drawTempHumPage();
+        drawPage(pageNum);
         disabled = false;
         tempTooLow = true;
       }
@@ -310,7 +311,7 @@ void checkTempAndHum(unsigned long interval) {
       if (h < 60 || t < 20) {
         prevPageNum = pageNum;
         pageNum = 5;
-        drawTempHumPage();
+        drawPage(pageNum);
         disabled = false;
         tempTooLow = true;
       }
@@ -322,7 +323,7 @@ void checkTempAndHum(unsigned long interval) {
     if (tempTooLow) {
       tempTooLow = false; 
       pageNum = prevPageNum;
-      drawOptionsPages(pageNum);
+      drawPage(pageNum);
     }
   }
   prevBtnState3 = btnState3;
@@ -349,9 +350,9 @@ void checkWaterLevel(unsigned long interval) {
 
   // Only display the notification if it is not already shown 
   if (needsRefill && pageNum != 4) {
-    prevPageNum = pageNum;
-    drawRefillPage();
+    prevPageNum = pageNum;  
     pageNum = 4;
+    drawPage(pageNum);
   }
 
   // Dismiss the notification displayed if the water tank needs refilled 
@@ -359,7 +360,7 @@ void checkWaterLevel(unsigned long interval) {
     if (needsRefill && liquidlevel == HIGH) {
       needsRefill = false; 
       pageNum = prevPageNum;
-      drawOptionsPages(pageNum);
+      drawPage(pageNum);
     }
   }
 
@@ -418,11 +419,24 @@ void drawHomePage() {
 }
 
 /*
-* Method to draw each options on the LCD screen
+* Method to draw each main page on the LCD screen
 * Param: pageNum - the page number corresponding to the type of plant option chosen by the user on the home page 
 */
-void drawOptionsPages(int pageNum) {
-  if (pageNum == 1) {
+void drawPage(int pageNum) {
+  if (pageNum == 0) {
+    fillScreenBg(GREEN);
+    writeText(10, 10, "hello, what would you", YELLOW);
+    writeText(10, 30, "like to plant today?", YELLOW);
+
+    drawBtn(25, 60, 270, 50, 25, YELLOW, BROWN);  
+    drawBtn(25, 120, 270, 50, 25, YELLOW, BROWN);  
+    drawBtn(25, 180, 270, 50, 25, YELLOW, BROWN);
+
+    writeText(110, 80, "seedling", BLACK);
+    writeText(70, 140, "leafy herbs/veg", BLACK);
+    writeText(40, 200, "sun-loving fruit/veg", BLACK);
+  }
+  else if (pageNum == 1) {
     fillScreenBg(GREEN);
     drawBtn(25, 30, 270, 50, 25, YELLOW, BROWN); 
     writeText(110, 45, "seedling", BLACK); 
@@ -439,6 +453,21 @@ void drawOptionsPages(int pageNum) {
     drawBtn(25, 30, 270, 50, 25, YELLOW, BROWN);
     writeText(40, 45, "sun-loving fruit/veg", BLACK); 
     writeText(100, 120, "growing...", YELLOW);
+  }
+  else if (pageNum == 4) {
+    fillScreenBg(GREEN);
+    drawBtn(10, 20, 300, 100, 25, WHITE, YELLOW);
+    writeText(57, 62, "REFILL WATER TANK", BLACK);
+    drawBtn(75, 150, 170, 60, 25, YELLOW, BROWN);
+    writeText(137, 172, "DONE", BLACK);
+  }
+  else if (pageNum == 5) {
+    fillScreenBg(GREEN);
+    drawBtn(10, 20, 300, 100, 25, WHITE, YELLOW);
+    writeText(25, 57, "TEMPERATURE OR HUMIDITY", BLACK);
+    writeText(120, 77, "TOO LOW", BLACK);
+    drawBtn(75, 150, 170, 60, 25, YELLOW, BROWN);
+    writeText(137, 172, "DONE", BLACK);
   }
 }
 
